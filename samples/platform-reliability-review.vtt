@@ -1,0 +1,529 @@
+WEBVTT
+
+d23f0824-128b-2f33-0c5c-7fd0a6a3a450/10-0
+00:00:03.000 --> 00:00:08.320
+<v Maya Chen>Okay, let's get started. Thanks for making time, I know Monday mornings after an</v>
+
+d23f0824-128b-2f33-0c5c-7fd0a6a3a450/10-1
+00:00:08.520 --> 00:00:13.460
+<v Maya Chen>incident are never fun. This is the platform reliability review for last Thursday's</v>
+
+d23f0824-128b-2f33-0c5c-7fd0a6a3a450/10-2
+00:00:13.660 --> 00:00:17.080
+<v Maya Chen>checkout outage, plus the usual security and audit items.</v>
+
+36f675cc-81e7-4ef5-e8e2-5d940ed90475/11-0
+00:00:18.062 --> 00:00:23.382
+<v Grace Liu>Before we start, can I just say support is still getting tickets about it.</v>
+
+36f675cc-81e7-4ef5-e8e2-5d940ed90475/11-1
+00:00:23.582 --> 00:00:27.382
+<v Grace Liu>People saw failed payments and a few were charged twice.</v>
+
+8d116ece-1738-f7d9-3d9c-172411e20b8f/12-0
+00:00:27.916 --> 00:00:33.616
+<v Maya Chen>Yeah, we'll get to customer comms at the end. Vikram, can you walk us through</v>
+
+8d116ece-1738-f7d9-3d9c-172411e20b8f/12-1
+00:00:33.816 --> 00:00:35.316
+<v Maya Chen>the timeline?</v>
+
+a09f76b5-a170-b338-3926-3059f28c105d/13-0
+00:00:36.198 --> 00:00:43.038
+<v Vikram Iyer>Sure. So at 14:02 on Thursday we shipped payments-api 3.12. Around 14:20 traffic picked up, the autoscaler added</v>
+
+a09f76b5-a170-b338-3926-3059f28c105d/13-1
+00:00:43.238 --> 00:00:49.318
+<v Vikram Iyer>pods, and by 14:31 checkout started returning 502s. We were fully down for about thirty-eight minutes.</v>
+
+a09f76b5-a170-b338-3926-3059f28c105d/13-2
+00:00:49.518 --> 00:00:51.418
+<v Vikram Iyer>The rollback finished at 15:09.</v>
+
+3898d190-f9eb-dacc-0cb1-e29c658cda14/14-0
+00:00:52.443 --> 00:00:57.003
+<v Priya Raman>And the root cause is basically my change. 3.12 created a new</v>
+
+3898d190-f9eb-dacc-0cb1-e29c658cda14/14-1
+00:00:57.203 --> 00:01:03.283
+<v Priya Raman>Redis connection pool per request handler instead of sharing one per pod, so every pod opened</v>
+
+3898d190-f9eb-dacc-0cb1-e29c658cda14/14-2
+00:01:03.483 --> 00:01:06.143
+<v Priya Raman>roughly four times more connections than before.</v>
+
+8a6a63ec-24ed-e6a4-6b4c-b2424a23d596/15-0
+00:01:06.685 --> 00:01:13.525
+<v Vikram Iyer>Right, and when the autoscaler went from twelve pods to thirty, we blew straight past Redis maxclients. Redis</v>
+
+8a6a63ec-24ed-e6a4-6b4c-b2424a23d596/15-1
+00:01:13.725 --> 00:01:18.665
+<v Vikram Iyer>started refusing connections, and checkout doesn't have any fallback, so it just failed.</v>
+
+1a61dbe2-2e44-158b-ae97-ba94d0eda82f/16-0
+00:01:19.271 --> 00:01:24.591
+<v Alex Moreno>Which is also why the retries made it worse. Every refused connection retried three</v>
+
+1a61dbe2-2e44-158b-ae97-ba94d0eda82f/16-1
+00:01:24.791 --> 00:01:26.311
+<v Alex Moreno>times with no backoff.</v>
+
+b64ce422-8c38-fb29-18f1-35d25f557203/17-0
+00:01:27.334 --> 00:01:33.794
+<v Maya Chen>Okay. No blame here, the change went through review and none of us caught it. What matters</v>
+
+b64ce422-8c38-fb29-18f1-35d25f557203/17-1
+00:01:33.994 --> 00:01:37.414
+<v Maya Chen>is we don't repeat it. Priya, where's the fix?</v>
+
+6d76b07e-881e-d162-ae2e-b1547f150524/18-0
+00:01:37.971 --> 00:01:42.531
+<v Priya Raman>The proper fix is PR #418 in payments-api. It goes back to</v>
+
+6d76b07e-881e-d162-ae2e-b1547f150524/18-1
+00:01:42.731 --> 00:01:48.811
+<v Priya Raman>one shared pool per pod and caps it at fifty connections. It's up, it just needs</v>
+
+6d76b07e-881e-d162-ae2e-b1547f150524/18-2
+00:01:49.011 --> 00:01:52.811
+<v Priya Raman>one more review. I'll get PR #418 merged by Wednesday.</v>
+
+5c90a958-7403-e430-ec66-a78795e761d1/19-0
+00:01:54.010 --> 00:01:55.510
+<v Maya Chen>Good. Who's reviewing?</v>
+
+3e7d1bfb-c7a2-ea20-b2f1-4c942e05319a/20-0
+00:01:56.280 --> 00:01:58.560
+<v Alex Moreno>I can review it this afternoon.</v>
+
+babced20-57ee-05cd-e009-02c77ebff206/21-0
+00:01:59.134 --> 00:02:04.454
+<v Priya Raman>Oh, and just so everyone knows, I already merged the emergency rollback on Thursday,</v>
+
+babced20-57ee-05cd-e009-02c77ebff206/21-1
+00:02:04.654 --> 00:02:08.454
+<v Priya Raman>that's PR #415. It's deployed, that's what brought us back.</v>
+
+2a3af4d4-6b0a-18e8-830e-07bc1e398f10/22-0
+00:02:09.358 --> 00:02:15.438
+<v Maya Chen>Great. Vikram, the other thing that bothers me is detection. Why did it take us so</v>
+
+2a3af4d4-6b0a-18e8-830e-07bc1e398f10/22-1
+00:02:15.638 --> 00:02:17.138
+<v Maya Chen>long to notice?</v>
+
+c3baea9e-13de-ef86-ab10-31d0f646e1f4/23-0
+00:02:18.319 --> 00:02:23.259
+<v Vikram Iyer>Two reasons. First, the 5xx alert uses a five-minute average, so it only</v>
+
+c3baea9e-13de-ef86-ab10-31d0f646e1f4/23-1
+00:02:23.459 --> 00:02:29.159
+<v Vikram Iyer>fired at 14:45, fourteen minutes into the outage. Second, the page went to the old</v>
+
+c3baea9e-13de-ef86-ab10-31d0f646e1f4/23-2
+00:02:29.359 --> 00:02:35.059
+<v Vikram Iyer>platform rotation because the escalation policy still pointed at the team that was reorganised in</v>
+
+c3baea9e-13de-ef86-ab10-31d0f646e1f4/23-3
+00:02:35.259 --> 00:02:36.759
+<v Vikram Iyer>August.</v>
+
+57124242-5051-c1cc-d17f-9acae01f5057/24-0
+00:02:37.761 --> 00:02:39.661
+<v Maya Chen>That second one is scary.</v>
+
+119a72d1-74c9-df6a-cc01-1cdd9474031b/25-0
+00:02:40.787 --> 00:02:46.867
+<v Vikram Iyer>It was. The good news is I already fixed the PagerDuty escalation policy on Friday. Pages</v>
+
+119a72d1-74c9-df6a-cc01-1cdd9474031b/25-1
+00:02:47.067 --> 00:02:52.007
+<v Vikram Iyer>for checkout now go to the payments on-call first and then to me.</v>
+
+10a3d6b2-aa05-e11a-b271-5945795e8229/26-0
+00:02:53.263 --> 00:02:55.543
+<v Maya Chen>Thank you. And the alert itself?</v>
+
+d269a9a5-ae65-8f33-fe3b-890b93f448b3/27-0
+00:02:56.098 --> 00:03:02.558
+<v Vikram Iyer>I want a proper Redis saturation alert, something that fires when connections cross eighty percent of maxclients,</v>
+
+d269a9a5-ae65-8f33-fe3b-890b93f448b3/27-1
+00:03:02.758 --> 00:03:08.078
+<v Vikram Iyer>so we see it coming instead of finding out from customers. I'll add the</v>
+
+d269a9a5-ae65-8f33-fe3b-890b93f448b3/27-2
+00:03:08.278 --> 00:03:12.838
+<v Vikram Iyer>Redis connection saturation alert in infra-monitoring by tomorrow, it's issue #56 there.</v>
+
+58d5563d-ab2c-d31e-e315-128862c33a4f/28-0
+00:03:13.739 --> 00:03:17.919
+<v Alex Moreno>Can we also switch the 5xx alert to a one-minute window?</v>
+
+1df9fd78-9c65-3938-2b05-37e65affb229/29-0
+00:03:18.439 --> 00:03:22.999
+<v Vikram Iyer>Yeah, I'll fold that into the same change. Same issue, same deadline.</v>
+
+3f63af83-bd05-61e6-211c-70cf49952399/30-0
+00:03:23.943 --> 00:03:28.883
+<v Maya Chen>Okay. Alex, what about proving the fix actually holds under load? I don't</v>
+
+3f63af83-bd05-61e6-211c-70cf49952399/30-1
+00:03:29.083 --> 00:03:31.743
+<v Maya Chen>want to find out in production again.</v>
+
+8ca81811-66d2-2876-72fd-f2022a96fb1a/31-0
+00:03:32.601 --> 00:03:39.441
+<v Alex Moreno>I want to reproduce the incident in staging with a load test, basically replay Thursday's traffic curve against</v>
+
+8ca81811-66d2-2876-72fd-f2022a96fb1a/31-1
+00:03:39.641 --> 00:03:45.341
+<v Alex Moreno>the new pool settings. The problem is staging Redis is tiny, it's a single small</v>
+
+8ca81811-66d2-2876-72fd-f2022a96fb1a/31-2
+00:03:45.541 --> 00:03:48.961
+<v Alex Moreno>node, so the test won't tell us anything real.</v>
+
+8cdb305f-dd2e-1609-6e36-aab0d1bc52d9/32-0
+00:03:49.712 --> 00:03:51.232
+<v Maya Chen>What do you need?</v>
+
+153e7c2a-26a2-c0bd-3b12-87fff52ddf5d/33-0
+00:03:51.982 --> 00:03:57.682
+<v Alex Moreno>Staging Redis resized to match production. That needs budget approval, it's about four hundred dollars</v>
+
+153e7c2a-26a2-c0bd-3b12-87fff52ddf5d/33-1
+00:03:57.882 --> 00:04:03.202
+<v Alex Moreno>a month extra. So right now I'm blocked on that. Once staging is resized,</v>
+
+153e7c2a-26a2-c0bd-3b12-87fff52ddf5d/33-2
+00:04:03.402 --> 00:04:09.862
+<v Alex Moreno>I will run the load test replaying Thursday's traffic and share the results, ideally by end of</v>
+
+153e7c2a-26a2-c0bd-3b12-87fff52ddf5d/33-3
+00:04:10.062 --> 00:04:11.562
+<v Alex Moreno>next week.</v>
+
+7c26847f-0316-909e-3bbb-e9eaa8948c89/34-0
+00:04:12.221 --> 00:04:14.501
+<v Maya Chen>I'll approve that after this call.</v>
+
+254b0c4e-010c-4759-482c-9cbc43435cc5/35-0
+00:04:15.749 --> 00:04:17.249
+<v Alex Moreno>Perfect.</v>
+
+20203626-f3fe-39c0-5190-88f590fbbd11/36-0
+00:04:18.126 --> 00:04:23.446
+<v Priya Raman>Should we also add a circuit breaker around Redis? Even with the pool fix,</v>
+
+20203626-f3fe-39c0-5190-88f590fbbd11/36-1
+00:04:23.646 --> 00:04:27.066
+<v Priya Raman>if Redis goes down checkout still falls over completely.</v>
+
+ad1b72db-a7ab-e1c2-9e1a-8ef4f341e07a/37-0
+00:04:28.187 --> 00:04:30.847
+<v Maya Chen>I think we should. Is that big?</v>
+
+cc4169a3-ae3a-2b7f-dfe0-1893f3aed0b6/38-0
+00:04:32.013 --> 00:04:37.713
+<v Priya Raman>Not huge. Once PR #418 is in, I'll add a circuit breaker around the Redis</v>
+
+cc4169a3-ae3a-2b7f-dfe0-1893f3aed0b6/38-1
+00:04:37.913 --> 00:04:44.753
+<v Priya Raman>calls in checkout so it degrades to the database instead of failing. I'd say by the end of</v>
+
+cc4169a3-ae3a-2b7f-dfe0-1893f3aed0b6/38-2
+00:04:44.953 --> 00:04:47.233
+<v Priya Raman>the sprint, so Friday next week.</v>
+
+7b45145c-1a81-682c-64e5-0cad66237a04/39-0
+00:04:48.236 --> 00:04:52.796
+<v Vikram Iyer>I'll personally unplug that Redis box if it ever does this again.</v>
+
+3571810a-fc13-2d0d-113d-b17d30cbc97d/40-0
+00:04:53.867 --> 00:04:56.907
+<v Priya Raman>Please don't, it's the only one we have.</v>
+
+9118bb16-000f-49c8-1a35-8ca00d75985d/41-0
+00:04:57.804 --> 00:05:02.364
+<v Maya Chen>Ha. Okay, and one more on this topic. If the load test</v>
+
+9118bb16-000f-49c8-1a35-8ca00d75985d/41-1
+00:05:02.564 --> 00:05:07.884
+<v Maya Chen>passes, I'd like the autoscaler max back at forty pods. Right now it's capped</v>
+
+9118bb16-000f-49c8-1a35-8ca00d75985d/41-2
+00:05:08.084 --> 00:05:10.364
+<v Maya Chen>at twenty as a safety measure.</v>
+
+dfd43f37-1200-339d-0687-39fa9d1de2a0/42-0
+00:05:11.000 --> 00:05:15.560
+<v Alex Moreno>If the load test passes, I'll raise the autoscaler max back to</v>
+
+dfd43f37-1200-339d-0687-39fa9d1de2a0/42-1
+00:05:15.760 --> 00:05:18.800
+<v Alex Moreno>forty in infra-terraform. Let's say the Monday after.</v>
+
+58ee8571-f499-8d7c-4093-f6dea268aa87/43-0
+00:05:19.487 --> 00:05:25.187
+<v Maya Chen>Good. Let's move to security, because the audit is next Thursday and we are not</v>
+
+58ee8571-f499-8d7c-4093-f6dea268aa87/43-1
+00:05:25.387 --> 00:05:27.667
+<v Maya Chen>where I want to be. Elena?</v>
+
+774b15d7-fa52-9ba3-fe3b-fada7cf20724/44-0
+00:05:28.709 --> 00:05:34.409
+<v Elena Petrova>So two things. The big one is the SOC 2 evidence. The auditors want the</v>
+
+774b15d7-fa52-9ba3-fe3b-fada7cf20724/44-1
+00:05:34.609 --> 00:05:39.169
+<v Elena Petrova>Q3 access reviews for every production system, with sign-off. That's tracked in</v>
+
+774b15d7-fa52-9ba3-fe3b-fada7cf20724/44-2
+00:05:39.369 --> 00:05:43.929
+<v Elena Petrova>Jira as SEC-231. I've done about two thirds. I'll finish the access</v>
+
+774b15d7-fa52-9ba3-fe3b-fada7cf20724/44-3
+00:05:44.129 --> 00:05:49.069
+<v Elena Petrova>review evidence for SEC-231 and upload it to the audit portal by Friday.</v>
+
+bfeaa155-1a28-f7b3-24e4-e25a15fc899e/45-0
+00:05:50.001 --> 00:05:51.501
+<v Maya Chen>What's missing?</v>
+
+842e7fc2-2954-0a6e-b12a-a1f6d42fddbb/46-0
+00:05:52.310 --> 00:05:57.630
+<v Elena Petrova>Mostly the Redis and the data warehouse access lists. Vikram, I'll need you to</v>
+
+842e7fc2-2954-0a6e-b12a-a1f6d42fddbb/46-1
+00:05:57.830 --> 00:06:00.110
+<v Elena Petrova>export who has admin on Redis.</v>
+
+8b0d590b-b0a8-44e5-2587-be6b5c9bcf35/47-0
+00:06:00.631 --> 00:06:02.911
+<v Vikram Iyer>I can send you that today.</v>
+
+174c77a2-dd02-de92-a496-36a2fa7f0eab/48-0
+00:06:04.233 --> 00:06:11.073
+<v Elena Petrova>Thanks. The second thing is the OpenSSL vulnerability that came out last week. Our base images are still</v>
+
+174c77a2-dd02-de92-a496-36a2fa7f0eab/48-1
+00:06:11.273 --> 00:06:17.353
+<v Elena Petrova>on the vulnerable version. It's issue #97 in platform-images. I'll rebuild the base images with the</v>
+
+174c77a2-dd02-de92-a496-36a2fa7f0eab/48-2
+00:06:17.553 --> 00:06:21.733
+<v Elena Petrova>patched OpenSSL and roll them out by Thursday, before the audit.</v>
+
+2ac34446-e883-a1d4-5de0-099784b5a818/49-0
+00:06:22.860 --> 00:06:25.900
+<v Maya Chen>Is that risky with everything else going on?</v>
+
+5464ecc2-80b0-c08b-c770-24208aa4248c/50-0
+00:06:26.720 --> 00:06:31.660
+<v Elena Petrova>It's a minor version bump. I'll do payments-api last, after Priya's fix is</v>
+
+5464ecc2-80b0-c08b-c770-24208aa4248c/50-1
+00:06:31.860 --> 00:06:34.520
+<v Elena Petrova>out, so we don't mix two changes.</v>
+
+c2216b02-fc24-1d0b-c9d4-88b1cfbf3360/51-0
+00:06:35.593 --> 00:06:37.093
+<v Priya Raman>Appreciated.</v>
+
+bd685167-6693-4036-d17e-44973d4882a5/52-0
+00:06:38.360 --> 00:06:43.300
+<v Alex Moreno>On a related note, the TLS certificate for api-gateway expires in twelve days.</v>
+
+bb2313f5-5b06-258e-7e26-f36a8483f8b8/53-0
+00:06:44.523 --> 00:06:46.423
+<v Maya Chen>Twelve days? Who renews that?</v>
+
+9aea6429-b149-1e24-3192-b70442594052/54-0
+00:06:46.949 --> 00:06:51.509
+<v Alex Moreno>Right now, nobody, which is the problem. It was always done by</v>
+
+9aea6429-b149-1e24-3192-b70442594052/54-1
+00:06:51.709 --> 00:06:58.549
+<v Alex Moreno>hand. I renewed it manually last time. This time I want it automated with cert-manager so we stop</v>
+
+9aea6429-b149-1e24-3192-b70442594052/54-2
+00:06:58.749 --> 00:07:04.069
+<v Alex Moreno>having this conversation. I'll set up automatic certificate renewal for api-gateway with cert-manager, issue</v>
+
+9aea6429-b149-1e24-3192-b70442594052/54-3
+00:07:04.269 --> 00:07:07.309
+<v Alex Moreno>#203 in infra-terraform, by end of this week.</v>
+
+fcf00fec-b91e-e9e5-efe0-9f07cefe2a1f/55-0
+00:07:08.670 --> 00:07:14.370
+<v Maya Chen>Good. And make sure the current one gets renewed regardless, even if the automation slips.</v>
+
+78572976-3a12-917c-1a26-f88938703800/56-0
+00:07:15.185 --> 00:07:20.505
+<v Alex Moreno>Yes, the automation will renew it on first run. If it isn't working by</v>
+
+78572976-3a12-917c-1a26-f88938703800/56-1
+00:07:20.705 --> 00:07:23.745
+<v Alex Moreno>Thursday I'll renew it manually as a fallback.</v>
+
+9c3a23cd-e67a-9b75-fc39-47249fc2d0a1/57-0
+00:07:24.422 --> 00:07:29.362
+<v Maya Chen>Okay. Someone should really look at the flaky canary check too, it's failed</v>
+
+9c3a23cd-e67a-9b75-fc39-47249fc2d0a1/57-1
+00:07:29.562 --> 00:07:31.082
+<v Maya Chen>three deploys this month.</v>
+
+ccb573d9-5810-d60e-a729-91b9e8c14743/58-0
+00:07:32.338 --> 00:07:33.838
+<v Vikram Iyer>Agreed, it's noisy.</v>
+
+63771407-e8e7-2789-1eb2-0109a91c2439/59-0
+00:07:34.917 --> 00:07:40.617
+<v Maya Chen>Sam owns the canary stuff and he's out today. I'll mention it to him tomorrow.</v>
+
+2db3997f-e396-39be-7a60-5a91330698a1/60-0
+00:07:41.821 --> 00:07:48.281
+<v Grace Liu>Can I raise the log costs thing? Finance flagged that our logging bill went up forty percent.</v>
+
+f237e45a-cd02-c5e1-1635-3d03551fd8f9/61-0
+00:07:49.172 --> 00:07:53.352
+<v Vikram Iyer>That's mostly debug logs from payments-api that never got turned off.</v>
+
+15bd448f-f261-49ed-be4c-5ce666c1494e/62-0
+00:07:54.726 --> 00:08:00.426
+<v Maya Chen>Let's park the log costs for the quarterly review, it's not urgent this week and</v>
+
+15bd448f-f261-49ed-be4c-5ce666c1494e/62-1
+00:08:00.626 --> 00:08:02.526
+<v Maya Chen>we have enough going on.</v>
+
+26b1cffc-070d-7109-2085-9634fe3c9c8f/63-0
+00:08:03.678 --> 00:08:05.178
+<v Grace Liu>Fair.</v>
+
+9c9011ef-256b-adf9-a7e6-529bce76e9f4/64-0
+00:08:06.210 --> 00:08:09.250
+<v Maya Chen>Grace, customer side. What do we owe people?</v>
+
+057a40b2-2188-287e-8c5c-715f8c74fc1e/65-0
+00:08:10.494 --> 00:08:16.194
+<v Grace Liu>Two things. The double charges need refunds, but finance is already processing those, that's not</v>
+
+057a40b2-2188-287e-8c5c-715f8c74fc1e/65-1
+00:08:16.394 --> 00:08:22.854
+<v Grace Liu>on us. The other is a public incident report. Customers and a couple of enterprise accounts are</v>
+
+057a40b2-2188-287e-8c5c-715f8c74fc1e/65-2
+00:08:23.054 --> 00:08:28.374
+<v Grace Liu>asking what happened. I'll publish the customer-facing incident report on the status page by</v>
+
+057a40b2-2188-287e-8c5c-715f8c74fc1e/65-3
+00:08:28.574 --> 00:08:31.234
+<v Grace Liu>Wednesday, once Maya has reviewed the wording.</v>
+
+bfdefc15-86ce-03f9-1a4f-44f9a6511445/66-0
+00:08:31.747 --> 00:08:35.167
+<v Maya Chen>I'll review it as soon as you send it.</v>
+
+d37ee915-31de-c4f4-df2a-8b79fc8e80b3/67-0
+00:08:36.507 --> 00:08:41.067
+<v Grace Liu>And I'll ping support to let them know the report is coming.</v>
+
+c38084a0-3d93-fd4c-804c-25d64affdcd1/68-0
+00:08:42.354 --> 00:08:46.914
+<v Maya Chen>Thanks. On our side, I'll write the internal postmortem with the timeline,</v>
+
+c38084a0-3d93-fd4c-804c-25d64affdcd1/68-1
+00:08:47.114 --> 00:08:52.434
+<v Maya Chen>root cause and all the action items from today, and circulate it by tomorrow</v>
+
+c38084a0-3d93-fd4c-804c-25d64affdcd1/68-2
+00:08:52.634 --> 00:08:54.134
+<v Maya Chen>evening.</v>
+
+218e0b7b-d58d-cdb4-6b44-68068b5ab3ee/69-0
+00:08:55.161 --> 00:09:00.101
+<v Vikram Iyer>Can we also schedule the database failover drill? We skipped it last quarter.</v>
+
+a997f351-754a-09cd-e5cf-edfa5a9196f0/70-0
+00:09:00.656 --> 00:09:03.696
+<v Maya Chen>Is that realistic with the audit next week?</v>
+
+806c10b5-e0cf-ab4c-eaef-c4d2d3bf6d01/71-0
+00:09:04.721 --> 00:09:10.801
+<v Vikram Iyer>Not before the audit. I'll run the database failover drill for payments-db the week after the</v>
+
+806c10b5-e0cf-ab4c-eaef-c4d2d3bf6d01/71-1
+00:09:11.001 --> 00:09:13.661
+<v Vikram Iyer>audit, let's say Wednesday the week after.</v>
+
+df703017-04c9-d78d-82b3-359986048719/72-0
+00:09:14.279 --> 00:09:15.779
+<v Maya Chen>Okay, that works.</v>
+
+265974a7-cc96-6f46-c6aa-7d550101b811/73-0
+00:09:16.675 --> 00:09:21.615
+<v Priya Raman>Should we also think about moving sessions out of Redis entirely at some</v>
+
+265974a7-cc96-6f46-c6aa-7d550101b811/73-1
+00:09:21.815 --> 00:09:23.315
+<v Priya Raman>point?</v>
+
+8e752fdf-1ece-615d-b9a6-442e9e7d6b37/74-0
+00:09:23.970 --> 00:09:29.290
+<v Maya Chen>Maybe, but that's a bigger design discussion. Let's discuss it next time, not today.</v>
+
+7b8444d1-8e31-7041-87dd-aeb784b28054/75-0
+00:09:29.846 --> 00:09:31.346
+<v Priya Raman>Sure.</v>
+
+73c1cd2c-81f9-8b52-1905-d591c5b2e75a/76-0
+00:09:32.552 --> 00:09:37.112
+<v Maya Chen>Okay, let me read back what I have so nobody leaves confused.</v>
+
+73c1cd2c-81f9-8b52-1905-d591c5b2e75a/76-1
+00:09:37.312 --> 00:09:43.392
+<v Maya Chen>Priya, PR #418 merged by Wednesday, then the circuit breaker by next Friday. Vikram, saturation alert</v>
+
+73c1cd2c-81f9-8b52-1905-d591c5b2e75a/76-2
+00:09:43.592 --> 00:09:48.152
+<v Maya Chen>and the one-minute 5xx window by tomorrow, and the failover drill after</v>
+
+73c1cd2c-81f9-8b52-1905-d591c5b2e75a/76-3
+00:09:48.352 --> 00:09:53.292
+<v Maya Chen>the audit. Alex, load test once staging is resized, cert-manager automation this week,</v>
+
+73c1cd2c-81f9-8b52-1905-d591c5b2e75a/76-4
+00:09:53.492 --> 00:09:58.432
+<v Maya Chen>and the autoscaler back to forty if the test passes. Elena, SEC-231 evidence</v>
+
+73c1cd2c-81f9-8b52-1905-d591c5b2e75a/76-5
+00:09:58.632 --> 00:10:03.952
+<v Maya Chen>by Friday and the patched base images by Thursday. Grace, the public incident report</v>
+
+73c1cd2c-81f9-8b52-1905-d591c5b2e75a/76-6
+00:10:04.152 --> 00:10:07.952
+<v Maya Chen>by Wednesday. And I've got the postmortem by tomorrow evening.</v>
+
+7178ba0a-1038-f0b5-e998-d0eee4ddf9b9/77-0
+00:10:08.957 --> 00:10:10.477
+<v Elena Petrova>That's everything for me.</v>
+
+b156d1ad-330c-16a3-831d-03bf9b2bd6c0/78-0
+00:10:11.270 --> 00:10:12.770
+<v Alex Moreno>Same.</v>
+
+81fc069e-7a60-9683-ceaf-4915888564e8/79-0
+00:10:13.520 --> 00:10:17.320
+<v Vikram Iyer>One thing, I'll remind everyone about the audit on Wednesday.</v>
+
+ed84e91e-f132-bf2d-e040-015ce064a114/80-0
+00:10:18.667 --> 00:10:25.127
+<v Maya Chen>Please do. Okay, thanks everyone. Good work getting us back up on Thursday, and let's make sure</v>
+
+ed84e91e-f132-bf2d-e040-015ce064a114/80-1
+00:10:25.327 --> 00:10:26.847
+<v Maya Chen>it doesn't happen again.</v>

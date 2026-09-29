@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ subject }}</title>
+</head>
+<body style="margin:0;padding:12px;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;line-height:1.5;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:860px;table-layout:fixed;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;">
+    <tr>
+      <td style="background:#0f172a;padding:24px 28px;border-radius:12px 12px 0 0;color:#ffffff;">
+        <div style="font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:#93c5fd;font-weight:700;">Pre-meeting briefing</div>
+        <div style="font-size:22px;font-weight:700;margin-top:4px;">{{ scope_title }}</div>
+        <div style="font-size:13px;color:#cbd5e1;margin-top:4px;">Status as of {{ today_display }} ({{ timezone }})</div>
+      </td>
+    </tr>
+    {% if github_mode == "simulated" %}
+    <tr>
+      <td style="padding:12px 28px;background:#fffbeb;border-bottom:1px solid #fde68a;font-size:12.5px;color:#92400e;">
+        GitHub is running in <strong>simulation mode</strong> for this workspace: statuses below come from simulated events, not a live repository.
+      </td>
+    </tr>
+    {% endif %}
+    <tr>
+      <td style="padding:24px 28px 8px;">
+        {% if recipient_name %}<p style="margin:0 0 12px;font-size:15px;font-weight:600;">Hi {{ recipient_name }},</p>{% endif %}
+        <p style="margin:0 0 16px;font-size:14px;">{{ executive_summary }}</p>
+        <div>
+          {% for metric in metrics %}
+          <div style="display:inline-block;vertical-align:top;min-width:120px;margin:0 8px 8px 0;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;">
+            <div style="font-size:20px;font-weight:800;color:{{ metric.color }};">{{ metric.value }}</div>
+            <div style="font-size:11.5px;color:#475569;font-weight:600;">{{ metric.label }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </td>
+    </tr>
+    {% if agenda %}
+    <tr>
+      <td style="padding:16px 28px 0;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:6px;">Suggested agenda</div>
+        <ol style="margin:0;padding-left:20px;font-size:13px;color:#334155;">
+          {% for item in agenda %}<li style="margin-bottom:4px;">{{ item }}</li>{% endfor %}
+        </ol>
+      </td>
+    </tr>
+    {% endif %}
+    <tr>
+      <td style="padding:20px 28px 24px;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;">Commitments ({{ items|length }})</div>
+        {% if items %}
+        <div style="overflow-x:auto;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:12.5px;border:1px solid #e2e8f0;min-width:560px;">
+          <thead>
+            <tr style="background:#f1f5f9;text-align:left;color:#334155;">
+              <th style="padding:8px 10px;">Priority</th>
+              <th style="padding:8px 10px;">Verdict</th>
+              <th style="padding:8px 10px;">Owner</th>
+              <th style="padding:8px 10px;">Commitment</th>
+              <th style="padding:8px 10px;">Target</th>
+              <th style="padding:8px 10px;">GitHub</th>
+              <th style="padding:8px 10px;">Why</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in items %}
+            <tr style="border-top:1px solid #e2e8f0;vertical-align:top;">
+              <td style="padding:8px 10px;white-space:nowrap;font-weight:700;color:{{ item.priority_color }};">{{ item.priority }}</td>
+              <td style="padding:8px 10px;white-space:nowrap;">
+                <span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;background:{{ item.badge_bg }};color:{{ item.badge_fg }};">{{ item.verdict_label }}</span>
+              </td>
+              <td style="padding:8px 10px;white-space:nowrap;font-weight:600;">{{ item.assignee }}</td>
+              <td style="padding:8px 10px;">{{ item.description }}{% if item.meeting_title %}<div style="color:#64748b;font-size:11px;">{{ item.meeting_title }}</div>{% endif %}</td>
+              <td style="padding:8px 10px;white-space:nowrap;">{{ item.target_display }}</td>
+              <td style="padding:8px 10px;white-space:nowrap;">
+                {% if item.github_url %}<a href="{{ item.github_url }}" style="color:#2563eb;">{{ item.ref_display }}</a>{% else %}{{ item.ref_display }}{% endif %}
+              </td>
+              <td style="padding:8px 10px;color:#475569;">{{ item.risk_reason }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        {% else %}
+        <p style="margin:0;font-size:13px;color:#64748b;">No approved commitments are being tracked yet.</p>
+        {% endif %}
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:14px 28px;border-top:1px solid #e2e8f0;font-size:11.5px;color:#94a3b8;text-align:center;">
+        Generated by the Promise vs. Progress engine &middot; narrative by {{ generated_by_label }}, figures from verified data
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

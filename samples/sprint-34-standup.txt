@@ -1,0 +1,7 @@
+Maya: Morning all. Quick round of commitments before the release on Tuesday.
+Maya: I will merge PR #101 in auth-service today to fix the token expiry handling.
+Priya: I'll fix issue #45, the race condition in the backend-core worker queue, by tomorrow.
+Alex: The audit-log migration is ready but I'm blocked on staging credentials. I will deploy issue #78 by Friday once I have them.
+Sam: I already merged PR #204 for the approval table yesterday.
+Sam: I will review Priya's worker fix tomorrow.
+Maya: Great, let's check where we are before Thursday's sync.

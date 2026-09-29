@@ -1,0 +1,94 @@
+Maya: Okay, I think everyone's here. Sam, you're on mute, just so you know.
+Sam: Sorry, sorry. Can you hear me now?
+Maya: Yep, loud and clear. Morning all. So this is the Sprint 35 planning sync, and we've got a lot to get through because the 2.4 release is next Thursday and the security audit lands the week after.
+Priya: Morning. I brought coffee, so I'm at about sixty percent capacity.
+Vikram: Sixty is generous for a Monday.
+Maya: Ha. Okay, let's start with a quick look back at last sprint, then commitments, then risks. Alex, you want to kick us off on the audit log work?
+Alex: Sure. So the audit-log migration is written and it passes locally against a copy of production data. The schema change itself is small, it's really the backfill that takes time.
+Maya: How long does the backfill take on the full dataset?
+Alex: About forty minutes on my machine. On staging it should be faster, but I honestly haven't been able to test that because I still don't have staging credentials.
+Vikram: That's on me. The credentials request got stuck in the approval queue.
+Alex: Yeah, so I'm blocked on staging access right now. As soon as I have it, I will deploy issue #78 to staging, and I'd like to do that by Wednesday.
+Vikram: I'll get your staging credentials sorted today. I just need Maya to approve the access request.
+Maya: I'll approve it right after this call. Remind me if I forget.
+Vikram: Oh, I'll remind you.
+Maya: Good. Priya, where are we on the worker queue issue?
+Priya: So, the race condition in the worker queue. I finally reproduced it on Friday. It happens when two workers pick up the same job within the same millisecond, and our lock uses a timestamp instead of a row-level lock.
+Sam: Wait, so we've been double-processing jobs this whole time?
+Priya: Not often. Maybe one in fifty thousand. But for the billing jobs, once is too many.
+Maya: Agreed. What's the fix?
+Priya: Switch to SELECT FOR UPDATE SKIP LOCKED. It's a small change but it touches the core scheduler, so I want proper tests around it. I'll fix issue #45 in backend-core by Wednesday, with a load test attached.
+Maya: Can you get a PR up earlier so Sam or Vikram can start reviewing?
+Priya: Yes, I'll open a draft PR tomorrow so people can look at the approach.
+Sam: I can review it. I'll review Priya's worker fix as soon as the draft is up.
+Maya: Perfect. Sam, how's the approval table going?
+Sam: Oh, that one's done. I already merged PR #204 for the approval table on Friday evening. The keyboard shortcuts made it in too.
+Elena: Did the accessibility fixes make it in, or were those split out?
+Sam: Most of them. The focus trap on the modal is in. The screen reader labels on the bulk actions are not, I split those out.
+Elena: Okay, can we make sure those don't get lost? The audit checklist has an item on it.
+Sam: Yep, I will finish the screen reader labels for the bulk actions under issue #219 by end of week.
+Elena: Thank you.
+Maya: Okay. Elena, security side?
+Elena: So there are three things. First, the base images. The scanner flagged CVE-2024-2144 in the Python base image we use for three services. The patched image is out.
+Vikram: Is that the one in the SSL library?
+Elena: That's the one. I'll patch the base images for CVE-2024-2144 under issue #112, and I want that done in 3 days because the audit team will run their scan early next week.
+Maya: Does that need a coordinated deploy?
+Elena: Not really, each service picks up the new base on its next build. But Vikram, I'd like the platform services rebuilt even if nobody touches their code.
+Vikram: Fair. I can trigger rebuilds for the idle services once your image is published.
+Elena: Second thing, the rate limiting on the public API. Maya, I think you had that?
+Maya: I did. The middleware is written, it's sitting in a branch. I will merge PR #302 with the rate-limiting middleware in api-gateway by Wednesday. I just want one more pair of eyes on the Redis key expiry logic.
+Vikram: I can look at the Redis bits.
+Maya: Great, thanks.
+Elena: And third, the secrets rotation. We still have two services reading database passwords from environment files instead of the vault.
+Alex: One of those is the reporting service, right? That's mine.
+Elena: Yes, reporting-service and the old notifier.
+Alex: I can move reporting-service to the vault, but not this sprint, not with the migration going on. Can we put it in the next sprint?
+Maya: Let's be honest about that then. Alex, don't take it this sprint. Elena, is the notifier something we can just retire?
+Elena: Actually, yes. Nothing has called it in six weeks.
+Maya: Then let's retire it instead of fixing it. Vikram, is that yours?
+Vikram: Sure. I'll decommission the old notifier service by next Monday, after I double-check the logs for any stragglers.
+Maya: Nice. One less thing to secure.
+Priya: Can I jump in on something related? The Redis session timeouts are back.
+Vikram: Oh no. The same error as last month?
+Priya: Same stack trace. Connection pool exhaustion during the morning traffic spike. We bumped the pool size last time, but that was a band-aid.
+Vikram: Yeah, the real problem is the connections that never get returned when a request times out. I've actually got a theory about that.
+Maya: Vikram, can you own it?
+Vikram: Yes. I'll resolve issue #91, the Redis session timeouts in backend-core, by Friday. If my theory's wrong I'll say so on Wednesday so we can re-plan.
+Maya: Appreciated. Early warnings are always better than surprises.
+Sam: Quick question on the frontend side. Are we still doing the dark mode thing this sprint, or is that officially parked?
+Maya: Parked. Nobody's asking for it and we have an audit coming.
+Sam: Totally fine by me, just wanted to confirm.
+Priya: Should we also look at connection pooling in general? Like, a proper review?
+Maya: Maybe, but not as a commitment today. Let's discuss it at the retro.
+Priya: Sounds good.
+Maya: Okay, product-facing work. The pre-meeting briefing email. Sam, that's frontend plus a bit of backend, right?
+Sam: Mostly frontend. The preview modal and the schedule picker. Backend already has the endpoints.
+Maya: What's realistic?
+Sam: I'm going to build the schedule picker in frontend-web, and I think I can have it ready for review by Thursday. The preview modal is done, it just needs the timezone fix.
+Elena: Is the email HTML escaped properly? The audit people will absolutely try to put a script tag in a meeting title.
+Sam: It's rendered from a server template with auto-escaping, and the preview runs in a sandboxed iframe. But please do try to break it.
+Elena: Oh, I will. I'll run the XSS checks against the briefing preview tomorrow.
+Maya: Love it. Alex, anything else from you?
+Alex: One thing. The docs for the migration runbook are out of date. If staging goes well, I'll write the rollout runbook for the audit-log migration before the release.
+Maya: Do you have a date in mind for that?
+Alex: Let's say 2026-10-09, the day before the release freeze.
+Maya: Good. Okay, let's talk dependencies, because I can already see a chain forming. Alex needs credentials from Vikram, and he needs my approval. Priya's fix needs Sam's review. My rate limiting needs Vikram's review. And Elena's image patch needs Vikram to trigger rebuilds.
+Vikram: So basically everything goes through me. Great.
+Priya: Welcome to platform, Vikram.
+Vikram: Ha. Honestly it's fine, as long as they don't all land on the same day.
+Maya: Let's stagger them then. Credentials today, Redis review tomorrow, rebuilds once Elena's image is out, and the notifier next Monday.
+Vikram: That works.
+Elena: One risk I want to flag. If the CVE patch slips past Thursday, the audit scan will flag it and we'll have to write a formal exception. That's a whole process.
+Maya: Understood. Elena, if anything blocks you, ping the channel immediately, don't wait for standup.
+Elena: Will do.
+Sam: Also, small thing. The staging environment was really slow on Friday. Did something change?
+Vikram: The nightly data refresh ran long. It's not related to Alex's migration, before anyone panics.
+Alex: I was about to panic.
+Maya: Okay. Let me read back what I've got, and stop me if anything is wrong. Alex, issue #78 to staging by Wednesday once you're unblocked, and the runbook by the ninth. Priya, issue #45 by Wednesday with the draft PR tomorrow. Sam, review Priya's fix, the screen reader labels by end of week, and the schedule picker by Thursday. Elena, the CVE patch in three days and the XSS checks tomorrow. Vikram, credentials today, the Redis timeouts by Friday, and the notifier decommission next Monday. And me, PR #302 by Wednesday, plus approving Alex's access right after this call.
+Priya: That matches my notes.
+Sam: Same.
+Vikram: Yep.
+Elena: All good.
+Alex: Good for me.
+Maya: Great. We'll check where everything actually stands before Thursday's sync, and the tracker will tell us what really got merged. Thanks everyone, and Sam, you're on mute again.
+Sam: I was saying bye!

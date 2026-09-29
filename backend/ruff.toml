@@ -1,0 +1,18 @@
+line-length = 140
+target-version = "py311"
+extend-exclude = ["venv", "migrations/versions"]
+
+[lint]
+select = ["E", "F", "I", "B", "UP", "S", "ASYNC"]
+ignore = [
+    "B008",   # FastAPI Depends/Query in defaults is idiomatic
+    "S101",   # assert is fine in tests
+    "UP007",  # Optional[...] kept for readability alongside pydantic
+    "UP045",
+    "UP006",
+    "UP035",
+]
+
+[lint.per-file-ignores]
+"tests/*" = ["S105", "S106", "E501"]
+"app/prompts/*" = ["E501"]  # prompt prose and examples are kept verbatim

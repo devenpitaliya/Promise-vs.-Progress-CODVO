@@ -1,0 +1,47 @@
+# Everything is configured from the single `.env` next to this file (see .env.example).
+name: promise-vs-progress
+
+services:
+  api:
+    build: ./backend
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false  # CI and bare environments pass variables directly
+    # Container-specific overrides; everything else (AI, GitHub, SMTP, limits...) comes from .env.
+    environment:
+      ENVIRONMENT: production
+      APP_RELOAD: "false"
+      DATA_DIR: /app/data
+      LOG_DIR: /app/logs
+      SAMPLES_DIR: /app/samples
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env (see .env.example)}
+      FRONTEND_URL: http://localhost:${WEB_PORT:-8080}
+    volumes:
+      - api_data:/app/data
+      - api_logs:/app/logs
+      - ./samples:/app/samples:ro
+    expose:
+      - "${APP_PORT:-8000}"
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        API_PREFIX: ${API_PREFIX:-/api/v1}
+        VITE_API_URL: ${VITE_API_URL:-}
+        VITE_API_TIMEOUT_MS: ${VITE_API_TIMEOUT_MS:-60000}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NGINX_PORT: "8080"
+      API_UPSTREAM: http://api:${APP_PORT:-8000}
+      API_PREFIX: ${API_PREFIX:-/api/v1}
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+
+volumes:
+  api_data:
+  api_logs:
